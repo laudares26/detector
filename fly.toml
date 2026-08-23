@@ -1,0 +1,35 @@
+# Configuração do app localizeobjetos no Fly.io (região gru - São Paulo).
+# Gerada para bater com a configuração já existente do app em produção.
+
+app = "localizeobjetos"
+primary_region = "gru"
+
+[build]
+
+[deploy]
+  strategy = "immediate"
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[http_service.checks]]
+  interval = "15s"
+  timeout = "5s"
+  grace_period = "60s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "4gb"
+  # Aumentado de 2gb (config anterior) para 4gb: o pipeline agora carrega
+  # 4 modelos simultaneamente em memória (Florence-2, Grounding DINO, SAM 2,
+  # tradutor) além do YOLO — 2gb tende a estourar (OOM) sob carga.

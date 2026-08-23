@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Localize Objetos — Pipeline Híbrido</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 20px; min-height: 100vh;
+    background: #0b0f14; color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex; justify-content: center;
+  }
+  .card { max-width: 720px; width: 100%; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  p.sub { color: #8b949e; margin-top: 0; margin-bottom: 28px; font-size: 14px; }
+  label { display: block; font-size: 13px; color: #8b949e; margin-bottom: 6px; margin-top: 18px; }
+  input, button, select {
+    width: 100%; padding: 11px 14px; border-radius: 8px; border: 1px solid #30363d;
+    background: #161b22; color: #e6edf3; font-size: 14px;
+  }
+  button {
+    margin-top: 24px; background: #2f81f7; border: none; font-weight: 600;
+    cursor: pointer; transition: background .15s;
+  }
+  button:hover { background: #1f6feb; }
+  button:disabled { background: #30363d; cursor: not-allowed; }
+  .row { display: flex; gap: 12px; }
+  .row > div { flex: 1; }
+  #status { margin-top: 20px; font-size: 13px; color: #8b949e; white-space: pre-wrap; }
+  #result { margin-top: 24px; display: none; }
+  #result video { width: 100%; border-radius: 10px; border: 1px solid #30363d; }
+  .links { margin-top: 12px; display: flex; gap: 16px; font-size: 13px; }
+  .links a { color: #58a6ff; text-decoration: none; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; margin-left: 8px;
+  }
+  .badge.yolo { background: #1a7f37; color: white; }
+  .badge.open_vocab { background: #9a6700; color: white; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Localize Objetos em Vídeos</h1>
+    <p class="sub">Pipeline híbrido: VLM (roteamento) → YOLO / Grounding DINO (detecção) → SAM 2 (segmentação)</p>
+
+    <label for="url">URL do YouTube</label>
+    <input id="url" placeholder="https://www.youtube.com/watch?v=..." />
+
+    <label for="query">O que você quer localizar?</label>
+    <input id="query" placeholder="ex: person, carro, pessoa vestindo vermelho..." />
+
+    <div class="row">
+      <div>
+        <label for="frames">Máx. de frames</label>
+        <input id="frames" type="number" value="60" min="4" max="200" />
+      </div>
+      <div>
+        <label for="stride">Intervalo entre frames</label>
+        <input id="stride" type="number" value="2" min="1" max="10" />
+      </div>
+    </div>
+
+    <button id="submit">Processar vídeo</button>
+    <div id="status"></div>
+
+    <div id="result">
+      <p style="font-size:13px;color:#8b949e;">
+        Rota escolhida pelo VLM: <span id="route"></span>
+        <span id="route-badge" class="badge"></span>
+      </p>
+      <video id="video" controls></video>
+      <div class="links">
+        <a id="video-link" href="#" target="_blank">Baixar MP4</a>
+        <a id="json-link" href="#" target="_blank">Ver JSON de detecções</a>
+      </div>
+    </div>
+  </div>
+
+<script>
+const btn = document.getElementById("submit");
+const statusEl = document.getElementById("status");
+const resultEl = document.getElementById("result");
+
+btn.addEventListener("click", async () => {
+  const youtube_url = document.getElementById("url").value.trim();
+  const query = document.getElementById("query").value.trim();
+  const max_frames = parseInt(document.getElementById("frames").value, 10);
+  const frame_stride = parseInt(document.getElementById("stride").value, 10);
+
+  if (!youtube_url || !query) {
+    statusEl.textContent = "Preencha a URL do YouTube e a consulta.";
+    return;
+  }
+
+  btn.disabled = true;
+  resultEl.style.display = "none";
+  statusEl.textContent = "Processando... (pode levar de 1 a alguns minutos, dependendo do vídeo)";
+
+  try {
+    const res = await fetch("/process", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ youtube_url, query, max_frames, frame_stride }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Erro ${res.status}`);
+    }
+    const data = await res.json();
+    statusEl.textContent = `Concluído em ${data.meta.elapsed_seconds}s — ${data.meta.frames_processed} frames processados.`;
+
+    document.getElementById("route").textContent = data.meta.vlm_interpretation.reasoning;
+    const badge = document.getElementById("route-badge");
+    badge.textContent = data.meta.vlm_interpretation.route;
+    badge.className = "badge " + data.meta.vlm_interpretation.route;
+
+    document.getElementById("video").src = data.video_url;
+    document.getElementById("video-link").href = data.video_url;
+    document.getElementById("json-link").href = data.json_url;
+    resultEl.style.display = "block";
+  } catch (e) {
+    statusEl.textContent = "Erro: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
