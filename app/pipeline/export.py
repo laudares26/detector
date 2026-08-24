@@ -6,6 +6,7 @@ Desenha caixas + IDs sobre os frames com detecção e gera:
 """
 import json
 import colorsys
+import textwrap
 
 import cv2
 from fpdf import FPDF
@@ -55,8 +56,10 @@ def build_pdf(pdf_path: str, meta: dict, hits: list[dict], max_images: int = 24)
     pdf.cell(0, 12, "DETECTOR - Relatorio de localizacao", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
     pdf.set_font("helvetica", "", 12)
-    pdf.multi_cell(0, 8, _txt(f"Video: {meta['youtube_url']}"))
-    pdf.multi_cell(0, 8, _txt(f"Objeto procurado: {meta['query']} (en: {meta['query_en']})"))
+    for line in textwrap.wrap(f"Video: {meta['youtube_url']}", width=80):
+        pdf.cell(0, 8, _txt(line), new_x="LMARGIN", new_y="NEXT")
+    for line in textwrap.wrap(f"Objeto procurado: {meta['query']} (en: {meta['query_en']})", width=80):
+        pdf.cell(0, 8, _txt(line), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
     pdf.set_font("helvetica", "B", 14)
     pdf.cell(0, 10, _txt(f"Objetos distintos encontrados: {n_objects}"), new_x="LMARGIN", new_y="NEXT")
