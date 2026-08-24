@@ -28,7 +28,7 @@ primary_region = "gru"
   path = "/health"
 
 [[vm]]
-  size = "shared-cpu-2x"
+  size = "performance-2x"
   memory = "4gb"
   # Aumentado de 2gb (config anterior) para 4gb: o pipeline agora carrega
   # 4 modelos simultaneamente em memória (Florence-2, Grounding DINO, SAM 2,
