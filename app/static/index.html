@@ -84,7 +84,7 @@
       <div class="steps">
         <div class="step" data-step="1"><span class="dot"></span> Baixando o vídeo</div>
         <div class="step" data-step="2"><span class="dot"></span> Entendendo a sua busca</div>
-        <div class="step" data-step="3"><span class="dot"></span> Detectando e segmentando os objetos</div>
+        <div class="step" data-step="3"><span class="dot"></span> Detectando e rastreando os objetos</div>
         <div class="step" data-step="4"><span class="dot"></span> Gerando o vídeo final</div>
       </div>
       <div id="detail"></div>
@@ -122,8 +122,8 @@ function setStep(n, pct) {
 function stepFromProgress(messages) {
   let step = 1, pct = 8, frameInfo = null;
   for (const m of messages) {
-    if (m.includes("[2/5]")) { step = 2; pct = 30; }
-    if (m.includes("[3/5]")) { step = 3; pct = 40; }
+    if (m.includes("[2/4]")) { step = 2; pct = 30; }
+    if (m.includes("[3/4]")) { step = 3; pct = 40; }
     const fm = m.match(/frame (\d+)\/(\d+)/);
     if (fm) {
       step = 3;
@@ -131,7 +131,7 @@ function stepFromProgress(messages) {
       pct = 40 + Math.round(frac * 50);
       frameInfo = `Analisando frame ${fm[1]} de ${fm[2]}…`;
     }
-    if (m.includes("[5/5]")) { step = 4; pct = 97; }
+    if (m.includes("[4/4]")) { step = 4; pct = 97; }
   }
   return { step, pct, frameInfo };
 }

@@ -27,8 +27,8 @@ os.makedirs(JOBS_DIR, exist_ok=True)
 app = FastAPI(title="DETECTOR")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-MAX_FRAMES = 40
-FRAME_STRIDE = 3
+MAX_FRAMES = 60
+FRAME_STRIDE = 2
 MAX_DURATION_S = 60
 
 jobs: dict[str, dict] = {}

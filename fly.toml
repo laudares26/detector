@@ -29,7 +29,5 @@ primary_region = "gru"
 
 [[vm]]
   size = "performance-2x"
-  memory = "4gb"
-  # Aumentado de 2gb (config anterior) para 4gb: o pipeline agora carrega
-  # 4 modelos simultaneamente em memória (Florence-2, Grounding DINO, SAM 2,
-  # tradutor) além do YOLO — 2gb tende a estourar (OOM) sob carga.
+  memory = "2gb"
+  # Pipeline enxuto (YOLO-World + tradutor) cabe com folga em 2gb.
