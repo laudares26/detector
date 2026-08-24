@@ -29,5 +29,5 @@ primary_region = "gru"
 
 [[vm]]
   size = "performance-2x"
-  memory = "2gb"
-  # Pipeline enxuto (YOLO-World + tradutor) cabe com folga em 2gb.
+  memory = "4gb"
+  # 4gb é o mínimo exigido pelo Fly para máquinas performance-2x.

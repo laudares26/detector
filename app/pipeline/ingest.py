@@ -1,91 +1,86 @@
 """
 Estágio 1 — Entrada
-Faz o download do vídeo (YouTube via yt-dlp) e extrai frames com OpenCV.
+Extrai apenas os frames necessários direto do stream do YouTube
+(yt-dlp resolve a URL do stream; ffmpeg amostra os frames), sem
+baixar o arquivo de vídeo inteiro.
 """
 import os
 import subprocess
+
 import cv2
 
-def download_video(youtube_url: str, out_dir: str, max_duration_s: int | None = None) -> str:
-    """Baixa o vídeo do YouTube com yt-dlp e retorna o caminho do arquivo mp4.
 
-    max_duration_s: se informado, baixa apenas os primeiros N segundos
-    (útil para testes rápidos do protótipo).
-    """
-    os.makedirs(out_dir, exist_ok=True)
-    out_template = os.path.join(out_dir, "source.%(ext)s")
+def _stream_url(youtube_url: str) -> str:
     cmd = [
-        "yt-dlp",
+        "yt-dlp", "-g",
         "-f", "best[height<=480]/bestvideo[height<=480]/best",
         "--no-playlist",
-        "-o", out_template,
         youtube_url,
     ]
-    if max_duration_s is not None:
-        cmd += ["--download-sections", f"*0-{max_duration_s}", "--force-keyframes-at-cuts"]
     proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode != 0:
-        raise RuntimeError(f"Falha ao baixar o vídeo: {proc.stderr.strip().splitlines()[-1] if proc.stderr else 'erro desconhecido'}")
-    source = None
-    for f in os.listdir(out_dir):
-        if f.startswith("source."):
-            source = os.path.join(out_dir, f)
-            break
-    if source is None:
-        raise RuntimeError("Download falhou: nenhum arquivo 'source.*' encontrado.")
-    return _normalize_video(source, out_dir, max_duration_s=max_duration_s)
+    if proc.returncode != 0 or not proc.stdout.strip():
+        err = proc.stderr.strip().splitlines()[-1] if proc.stderr else "erro desconhecido"
+        raise RuntimeError(f"Falha ao resolver o vídeo: {err}")
+    return proc.stdout.strip().splitlines()[0]
 
 
-def _normalize_video(source: str, out_dir: str, max_duration_s: int | None = None) -> str:
-    """Reencoda o vídeo para H.264 (MP4), garantindo que o OpenCV consiga
-    decodificá-lo (YouTube frequentemente entrega VP9/AV1, que o build do
-    OpenCV pode não abrir, resultando em zero frames extraídos)."""
-    normalized = os.path.join(out_dir, "normalized.mp4")
-    cmd = ["ffmpeg", "-y", "-i", source]
-    if max_duration_s is not None:
-        cmd += ["-t", str(max_duration_s)]
-    cmd += [
-        "-vf", "scale='min(640,iw)':-2",
-        "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
-        "-an", normalized,
+def extract_frames(youtube_url: str, out_dir: str, max_frames: int = 60,
+                   max_duration_s: int = 60) -> tuple[list[tuple[int, float, "cv2.Mat"]], dict]:
+    """Amostra até `max_frames` frames dos primeiros `max_duration_s` segundos
+    do vídeo, direto do stream. Retorna [(nº do frame no vídeo, timestamp_s,
+    frame_bgr), ...] e infos do vídeo."""
+    os.makedirs(out_dir, exist_ok=True)
+    url = _stream_url(youtube_url)
+
+    sample_fps = max_frames / max_duration_s
+    pattern = os.path.join(out_dir, "frame_%04d.jpg")
+    cmd = [
+        "ffmpeg", "-y",
+        "-t", str(max_duration_s),
+        "-i", url,
+        "-vf", f"fps={sample_fps},scale='min(640,iw)':-2",
+        "-frames:v", str(max_frames),
+        "-q:v", "3",
+        pattern,
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode != 0 or not os.path.exists(normalized):
-        raise RuntimeError("Falha ao converter o vídeo para um formato legível.")
-    return normalized
+    files = sorted(f for f in os.listdir(out_dir) if f.startswith("frame_") and f.endswith(".jpg"))
+    if not files:
+        err = proc.stderr.strip().splitlines()[-1] if proc.stderr else ""
+        raise RuntimeError(f"Nenhum frame extraído do vídeo. {err}")
 
+    # fps real do vídeo (para converter timestamp em nº de frame do vídeo original)
+    video_fps = _probe_fps(url) or 25.0
 
-def extract_frames(video_path: str, max_frames: int | None = None, stride: int = 1):
-    """Generator que produz (frame_idx, frame_bgr) do vídeo."""
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise RuntimeError(f"Não foi possível abrir o vídeo: {video_path}")
-    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    frames = []
+    for i, fname in enumerate(files):
+        frame = cv2.imread(os.path.join(out_dir, fname))
+        if frame is None:
+            continue
+        timestamp_s = i / sample_fps
+        original_frame_number = int(round(timestamp_s * video_fps))
+        frames.append((original_frame_number, timestamp_s, frame))
 
-    idx = 0
-    produced = 0
-    while True:
-        ok, frame = cap.read()
-        if not ok:
-            break
-        if idx % stride == 0:
-            yield idx, frame
-            produced += 1
-            if max_frames is not None and produced >= max_frames:
-                break
-        idx += 1
-    cap.release()
-
-
-def probe_video(video_path: str) -> dict:
-    cap = cv2.VideoCapture(video_path)
     info = {
-        "fps": cap.get(cv2.CAP_PROP_FPS) or 25.0,
-        "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-        "height": int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-        "frame_count": int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+        "fps": video_fps,
+        "sample_fps": sample_fps,
+        "frames_sampled": len(frames),
+        "duration_analyzed_s": max_duration_s,
     }
-    cap.release()
-    return info
+    return frames, info
+
+
+def _probe_fps(url: str) -> float | None:
+    proc = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=avg_frame_rate", "-of", "csv=p=0", url],
+        capture_output=True, text=True,
+    )
+    raw = proc.stdout.strip()
+    if proc.returncode != 0 or not raw or "/" not in raw:
+        return None
+    num, den = raw.split("/")[:2]
+    try:
+        return float(num) / float(den) if float(den) else None
+    except ValueError:
+        return None

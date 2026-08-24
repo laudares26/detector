@@ -5,7 +5,7 @@ Endpoints:
     GET  /health
     POST /process               {"youtube_url": "...", "query": "..."} -> {"job_id": ...}
     GET  /jobs/{job_id}/status  -> progresso em tempo real
-    GET  /jobs/{job_id}/video   -> MP4 anotado
+    GET  /jobs/{job_id}/report  -> relatório em PDF
     GET  /jobs/{job_id}/json    -> detecções em JSON
 """
 import os
@@ -28,7 +28,6 @@ app = FastAPI(title="DETECTOR")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 MAX_FRAMES = 60
-FRAME_STRIDE = 2
 MAX_DURATION_S = 60
 
 jobs: dict[str, dict] = {}
@@ -63,7 +62,6 @@ def _run_job(job_id: str, req: ProcessRequest):
             query=req.query,
             work_dir=work_dir,
             max_frames=MAX_FRAMES,
-            frame_stride=FRAME_STRIDE,
             max_duration_s=MAX_DURATION_S,
             progress_cb=progress,
         )
@@ -71,7 +69,7 @@ def _run_job(job_id: str, req: ProcessRequest):
             jobs[job_id].update(
                 status="done",
                 meta=result["meta"],
-                video_url=f"/jobs/{job_id}/video",
+                report_url=f"/jobs/{job_id}/report",
                 json_url=f"/jobs/{job_id}/json",
             )
     except Exception as exc:  # pragma: no cover - protótipo
@@ -97,12 +95,13 @@ def job_status(job_id: str):
         return dict(job)
 
 
-@app.get("/jobs/{job_id}/video")
-def get_video(job_id: str):
-    path = os.path.join(JOBS_DIR, job_id, "output_annotated.mp4")
+@app.get("/jobs/{job_id}/report")
+def get_report(job_id: str):
+    path = os.path.join(JOBS_DIR, job_id, "report.pdf")
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="job não encontrado")
-    return FileResponse(path, media_type="video/mp4")
+    return FileResponse(path, media_type="application/pdf",
+                        filename=f"detector_{job_id}.pdf")
 
 
 @app.get("/jobs/{job_id}/json")

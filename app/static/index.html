@@ -59,7 +59,7 @@
   #error { margin-top: 18px; font-size: 14px; color: #f87171; display: none; }
 
   #result { margin-top: 30px; display: none; }
-  #result video { width: 100%; border-radius: 14px; border: 1px solid #232c38; }
+  #result iframe { width: 100%; height: 460px; border-radius: 14px; border: 1px solid #232c38; background: #10161f; }
   .links { margin-top: 14px; display: flex; gap: 20px; justify-content: center; font-size: 14px; }
   .links a { color: #7dd3fc; text-decoration: none; }
   .links a:hover { text-decoration: underline; }
@@ -82,10 +82,10 @@
     <div id="panel">
       <div class="progress-track"><div class="progress-bar" id="bar"></div></div>
       <div class="steps">
-        <div class="step" data-step="1"><span class="dot"></span> Baixando o vídeo</div>
+        <div class="step" data-step="1"><span class="dot"></span> Extraindo frames do vídeo</div>
         <div class="step" data-step="2"><span class="dot"></span> Entendendo a sua busca</div>
         <div class="step" data-step="3"><span class="dot"></span> Detectando e rastreando os objetos</div>
-        <div class="step" data-step="4"><span class="dot"></span> Gerando o vídeo final</div>
+        <div class="step" data-step="4"><span class="dot"></span> Gerando o relatório PDF</div>
       </div>
       <div id="detail"></div>
     </div>
@@ -93,10 +93,10 @@
     <div id="error"></div>
 
     <div id="result">
-      <video id="video" controls autoplay muted loop></video>
+      <iframe id="report" title="Relatório PDF"></iframe>
       <div id="summary"></div>
       <div class="links">
-        <a id="video-link" href="#" target="_blank">Baixar MP4</a>
+        <a id="report-link" href="#" target="_blank">Baixar relatório (PDF)</a>
         <a id="json-link" href="#" target="_blank">Detecções (JSON)</a>
       </div>
     </div>
@@ -173,12 +173,13 @@ btn.addEventListener("click", async () => {
       if (st.status === "done") {
         setStep(5, 100);
         panel.style.display = "none";
-        document.getElementById("video").src = st.video_url;
-        document.getElementById("video-link").href = st.video_url;
+        document.getElementById("report").src = st.report_url;
+        document.getElementById("report-link").href = st.report_url;
         document.getElementById("json-link").href = st.json_url;
         document.getElementById("summary").textContent =
-          `${st.meta.frames_processed} frames analisados em ${st.meta.elapsed_seconds}s · ` +
-          `${st.meta.total_mask_instances} objeto(s) localizado(s)`;
+          `${st.meta.distinct_objects} objeto(s) distinto(s) · aparece em ` +
+          `${st.meta.frames_with_object} de ${st.meta.frames_processed} frames · ` +
+          `concluído em ${st.meta.elapsed_seconds}s`;
         resultEl.style.display = "block";
         break;
       }
