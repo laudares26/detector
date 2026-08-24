@@ -3,129 +3,194 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Localize Objetos — Pipeline Híbrido</title>
+<title>DETECTOR</title>
 <style>
   :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    margin: 0; padding: 40px 20px; min-height: 100vh;
-    background: #0b0f14; color: #e6edf3;
+    min-height: 100vh; padding: 56px 20px;
+    background: radial-gradient(1200px 600px at 50% -10%, #101826 0%, #0a0e14 55%);
+    color: #eef2f7;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     display: flex; justify-content: center;
   }
-  .card { max-width: 720px; width: 100%; }
-  h1 { font-size: 22px; margin-bottom: 4px; }
-  p.sub { color: #8b949e; margin-top: 0; margin-bottom: 28px; font-size: 14px; }
-  label { display: block; font-size: 13px; color: #8b949e; margin-bottom: 6px; margin-top: 18px; }
-  input, button, select {
-    width: 100%; padding: 11px 14px; border-radius: 8px; border: 1px solid #30363d;
-    background: #161b22; color: #e6edf3; font-size: 14px;
+  .card { max-width: 560px; width: 100%; }
+  h1 {
+    font-size: 34px; letter-spacing: 10px; font-weight: 800;
+    text-align: center; background: linear-gradient(90deg, #7dd3fc, #60a5fa, #a78bfa);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
   }
+  p.sub { color: #7d8896; text-align: center; margin: 10px 0 40px; font-size: 14px; }
+  label { display: block; font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+          color: #7d8896; margin: 22px 0 8px; }
+  input {
+    width: 100%; padding: 14px 16px; border-radius: 12px; border: 1px solid #232c38;
+    background: #10161f; color: #eef2f7; font-size: 15px; outline: none;
+    transition: border-color .15s;
+  }
+  input:focus { border-color: #60a5fa; }
   button {
-    margin-top: 24px; background: #2f81f7; border: none; font-weight: 600;
-    cursor: pointer; transition: background .15s;
+    width: 100%; margin-top: 30px; padding: 15px; border-radius: 12px; border: none;
+    background: linear-gradient(90deg, #2563eb, #7c3aed); color: white;
+    font-size: 15px; font-weight: 700; letter-spacing: .5px; cursor: pointer;
+    transition: opacity .15s;
   }
-  button:hover { background: #1f6feb; }
-  button:disabled { background: #30363d; cursor: not-allowed; }
-  .row { display: flex; gap: 12px; }
-  .row > div { flex: 1; }
-  #status { margin-top: 20px; font-size: 13px; color: #8b949e; white-space: pre-wrap; }
-  #result { margin-top: 24px; display: none; }
-  #result video { width: 100%; border-radius: 10px; border: 1px solid #30363d; }
-  .links { margin-top: 12px; display: flex; gap: 16px; font-size: 13px; }
-  .links a { color: #58a6ff; text-decoration: none; }
-  .badge {
-    display: inline-block; padding: 2px 8px; border-radius: 999px;
-    font-size: 11px; font-weight: 600; margin-left: 8px;
+  button:hover { opacity: .9; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  #panel { margin-top: 34px; display: none; }
+  .progress-track { height: 6px; border-radius: 999px; background: #1a2230; overflow: hidden; }
+  .progress-bar {
+    height: 100%; width: 0%; border-radius: 999px;
+    background: linear-gradient(90deg, #60a5fa, #a78bfa);
+    transition: width .6s ease;
   }
-  .badge.yolo { background: #1a7f37; color: white; }
-  .badge.open_vocab { background: #9a6700; color: white; }
+  .steps { margin-top: 18px; display: grid; gap: 10px; }
+  .step { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #56606d; }
+  .step .dot {
+    width: 10px; height: 10px; border-radius: 50%; background: #232c38; flex: none;
+  }
+  .step.active { color: #dbe6f3; }
+  .step.active .dot { background: #60a5fa; animation: pulse 1.2s infinite; }
+  .step.done { color: #8aa0b8; }
+  .step.done .dot { background: #34d399; animation: none; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(96,165,250,.5);} 50% { box-shadow: 0 0 0 6px rgba(96,165,250,0);} }
+  #detail { margin-top: 14px; font-size: 13px; color: #7d8896; min-height: 18px; }
+  #error { margin-top: 18px; font-size: 14px; color: #f87171; display: none; }
+
+  #result { margin-top: 30px; display: none; }
+  #result video { width: 100%; border-radius: 14px; border: 1px solid #232c38; }
+  .links { margin-top: 14px; display: flex; gap: 20px; justify-content: center; font-size: 14px; }
+  .links a { color: #7dd3fc; text-decoration: none; }
+  .links a:hover { text-decoration: underline; }
+  #summary { margin-top: 12px; text-align: center; font-size: 13px; color: #7d8896; }
 </style>
 </head>
 <body>
   <div class="card">
-    <h1>Localize Objetos em Vídeos</h1>
-    <p class="sub">Pipeline híbrido: VLM (roteamento) → YOLO / Grounding DINO (detecção) → SAM 2 (segmentação)</p>
+    <h1>DETECTOR</h1>
+    <p class="sub">Localize qualquer objeto em vídeos do YouTube</p>
 
-    <label for="url">URL do YouTube</label>
+    <label for="url">Vídeo do YouTube</label>
     <input id="url" placeholder="https://www.youtube.com/watch?v=..." />
 
-    <label for="query">O que você quer localizar?</label>
-    <input id="query" placeholder="ex: person, carro, pessoa vestindo vermelho..." />
+    <label for="query">O que localizar?</label>
+    <input id="query" placeholder="ex: pessoa, carro, cachorro correndo..." />
 
-    <div class="row">
-      <div>
-        <label for="frames">Máx. de frames</label>
-        <input id="frames" type="number" value="60" min="4" max="200" />
+    <button id="submit">Localizar</button>
+
+    <div id="panel">
+      <div class="progress-track"><div class="progress-bar" id="bar"></div></div>
+      <div class="steps">
+        <div class="step" data-step="1"><span class="dot"></span> Baixando o vídeo</div>
+        <div class="step" data-step="2"><span class="dot"></span> Entendendo a sua busca</div>
+        <div class="step" data-step="3"><span class="dot"></span> Detectando e segmentando os objetos</div>
+        <div class="step" data-step="4"><span class="dot"></span> Gerando o vídeo final</div>
       </div>
-      <div>
-        <label for="stride">Intervalo entre frames</label>
-        <input id="stride" type="number" value="2" min="1" max="10" />
-      </div>
+      <div id="detail"></div>
     </div>
 
-    <button id="submit">Processar vídeo</button>
-    <div id="status"></div>
+    <div id="error"></div>
 
     <div id="result">
-      <p style="font-size:13px;color:#8b949e;">
-        Rota escolhida pelo VLM: <span id="route"></span>
-        <span id="route-badge" class="badge"></span>
-      </p>
-      <video id="video" controls></video>
+      <video id="video" controls autoplay muted loop></video>
+      <div id="summary"></div>
       <div class="links">
         <a id="video-link" href="#" target="_blank">Baixar MP4</a>
-        <a id="json-link" href="#" target="_blank">Ver JSON de detecções</a>
+        <a id="json-link" href="#" target="_blank">Detecções (JSON)</a>
       </div>
     </div>
   </div>
 
 <script>
 const btn = document.getElementById("submit");
-const statusEl = document.getElementById("status");
+const panel = document.getElementById("panel");
+const bar = document.getElementById("bar");
+const detail = document.getElementById("detail");
+const errorEl = document.getElementById("error");
 const resultEl = document.getElementById("result");
+
+function setStep(n, pct) {
+  document.querySelectorAll(".step").forEach(el => {
+    const s = parseInt(el.dataset.step, 10);
+    el.classList.toggle("done", s < n);
+    el.classList.toggle("active", s === n);
+  });
+  bar.style.width = pct + "%";
+}
+
+function stepFromProgress(messages) {
+  let step = 1, pct = 8, frameInfo = null;
+  for (const m of messages) {
+    if (m.includes("[2/5]")) { step = 2; pct = 30; }
+    if (m.includes("[3/5]")) { step = 3; pct = 40; }
+    const fm = m.match(/frame (\d+)\/(\d+)/);
+    if (fm) {
+      step = 3;
+      const frac = parseInt(fm[1], 10) / parseInt(fm[2], 10);
+      pct = 40 + Math.round(frac * 50);
+      frameInfo = `Analisando frame ${fm[1]} de ${fm[2]}…`;
+    }
+    if (m.includes("[5/5]")) { step = 4; pct = 97; }
+  }
+  return { step, pct, frameInfo };
+}
 
 btn.addEventListener("click", async () => {
   const youtube_url = document.getElementById("url").value.trim();
   const query = document.getElementById("query").value.trim();
-  const max_frames = parseInt(document.getElementById("frames").value, 10);
-  const frame_stride = parseInt(document.getElementById("stride").value, 10);
-
   if (!youtube_url || !query) {
-    statusEl.textContent = "Preencha a URL do YouTube e a consulta.";
+    errorEl.style.display = "block";
+    errorEl.textContent = "Informe o link do YouTube e o que deseja localizar.";
     return;
   }
 
   btn.disabled = true;
+  btn.textContent = "Processando…";
+  errorEl.style.display = "none";
   resultEl.style.display = "none";
-  statusEl.textContent = "Processando... (pode levar de 1 a alguns minutos, dependendo do vídeo)";
+  panel.style.display = "block";
+  setStep(1, 5);
+  detail.textContent = "Preparando…";
 
   try {
     const res = await fetch("/process", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ youtube_url, query, max_frames, frame_stride }),
+      body: JSON.stringify({ youtube_url, query }),
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Erro ${res.status}`);
+    if (!res.ok) throw new Error("Não foi possível iniciar o processamento.");
+    const { job_id } = await res.json();
+
+    while (true) {
+      await new Promise(r => setTimeout(r, 2000));
+      const st = await fetch(`/jobs/${job_id}/status`).then(r => r.json());
+
+      const { step, pct, frameInfo } = stepFromProgress(st.progress || []);
+      setStep(step, pct);
+      detail.textContent = frameInfo || "";
+
+      if (st.status === "done") {
+        setStep(5, 100);
+        panel.style.display = "none";
+        document.getElementById("video").src = st.video_url;
+        document.getElementById("video-link").href = st.video_url;
+        document.getElementById("json-link").href = st.json_url;
+        document.getElementById("summary").textContent =
+          `${st.meta.frames_processed} frames analisados em ${st.meta.elapsed_seconds}s · ` +
+          `${st.meta.total_mask_instances} objeto(s) localizado(s)`;
+        resultEl.style.display = "block";
+        break;
+      }
+      if (st.status === "error") throw new Error(st.error || "Erro no processamento.");
     }
-    const data = await res.json();
-    statusEl.textContent = `Concluído em ${data.meta.elapsed_seconds}s — ${data.meta.frames_processed} frames processados.`;
-
-    document.getElementById("route").textContent = data.meta.vlm_interpretation.reasoning;
-    const badge = document.getElementById("route-badge");
-    badge.textContent = data.meta.vlm_interpretation.route;
-    badge.className = "badge " + data.meta.vlm_interpretation.route;
-
-    document.getElementById("video").src = data.video_url;
-    document.getElementById("video-link").href = data.video_url;
-    document.getElementById("json-link").href = data.json_url;
-    resultEl.style.display = "block";
   } catch (e) {
-    statusEl.textContent = "Erro: " + e.message;
+    panel.style.display = "none";
+    errorEl.style.display = "block";
+    errorEl.textContent = "Erro: " + e.message;
   } finally {
     btn.disabled = false;
+    btn.textContent = "Localizar";
   }
 });
 </script>

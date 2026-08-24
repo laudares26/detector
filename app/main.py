@@ -1,18 +1,15 @@
 """
-API FastAPI do protótipo — mesma convenção do seu app existente
-(localizeobjetos.fly.dev): POST com URL do YouTube + consulta,
-retorna MP4 anotado + JSON.
-
-Rodar localmente:
-    uvicorn app.main:app --reload --port 8000
+API FastAPI do DETECTOR — localiza objetos em vídeos do YouTube.
 
 Endpoints:
     GET  /health
-    POST /process        {"youtube_url": "...", "query": "...", "max_frames": 60}
+    POST /process               {"youtube_url": "...", "query": "..."} -> {"job_id": ...}
+    GET  /jobs/{job_id}/status  -> progresso em tempo real
     GET  /jobs/{job_id}/video   -> MP4 anotado
     GET  /jobs/{job_id}/json    -> detecções em JSON
 """
 import os
+import threading
 import uuid
 
 from fastapi import FastAPI, HTTPException
@@ -27,15 +24,20 @@ JOBS_DIR = os.path.join(BASE_DIR, "outputs")
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 os.makedirs(JOBS_DIR, exist_ok=True)
 
-app = FastAPI(title="Video Object Search — Pipeline Híbrido (VLM + YOLO + Grounding DINO + SAM 2)")
+app = FastAPI(title="DETECTOR")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+MAX_FRAMES = 60
+FRAME_STRIDE = 2
+MAX_DURATION_S = 60
+
+jobs: dict[str, dict] = {}
+jobs_lock = threading.Lock()
 
 
 class ProcessRequest(BaseModel):
     youtube_url: str
     query: str
-    max_frames: int = 60
-    frame_stride: int = 2
 
 
 @app.get("/health")
@@ -48,27 +50,51 @@ def root():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 
-@app.post("/process")
-def process(req: ProcessRequest):
-    job_id = uuid.uuid4().hex[:10]
+def _run_job(job_id: str, req: ProcessRequest):
     work_dir = os.path.join(JOBS_DIR, job_id)
+
+    def progress(msg: str):
+        with jobs_lock:
+            jobs[job_id]["progress"].append(msg)
+
     try:
         result = run_pipeline(
             youtube_url=req.youtube_url,
             query=req.query,
             work_dir=work_dir,
-            max_frames=req.max_frames,
-            frame_stride=req.frame_stride,
+            max_frames=MAX_FRAMES,
+            frame_stride=FRAME_STRIDE,
+            max_duration_s=MAX_DURATION_S,
+            progress_cb=progress,
         )
+        with jobs_lock:
+            jobs[job_id].update(
+                status="done",
+                meta=result["meta"],
+                video_url=f"/jobs/{job_id}/video",
+                json_url=f"/jobs/{job_id}/json",
+            )
     except Exception as exc:  # pragma: no cover - protótipo
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        with jobs_lock:
+            jobs[job_id].update(status="error", error=str(exc))
 
-    return {
-        "job_id": job_id,
-        "meta": result["meta"],
-        "video_url": f"/jobs/{job_id}/video",
-        "json_url": f"/jobs/{job_id}/json",
-    }
+
+@app.post("/process")
+def process(req: ProcessRequest):
+    job_id = uuid.uuid4().hex[:10]
+    with jobs_lock:
+        jobs[job_id] = {"status": "running", "progress": []}
+    threading.Thread(target=_run_job, args=(job_id, req), daemon=True).start()
+    return {"job_id": job_id, "status_url": f"/jobs/{job_id}/status"}
+
+
+@app.get("/jobs/{job_id}/status")
+def job_status(job_id: str):
+    with jobs_lock:
+        job = jobs.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="job não encontrado")
+        return dict(job)
 
 
 @app.get("/jobs/{job_id}/video")

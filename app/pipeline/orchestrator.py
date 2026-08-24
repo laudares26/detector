@@ -79,7 +79,7 @@ def run_pipeline(
         annotated = export_mod.draw_frame(frame, detections)
         exporter.write(frame_idx, timestamp_s, annotated, detections)
 
-        if i % 10 == 0:
+        if i % 5 == 0 or i == len(frames_iter) - 1:
             log(f"      frame {i + 1}/{len(frames_iter)} — {len(detections)} objeto(s) segmentado(s)")
 
     meta = {
